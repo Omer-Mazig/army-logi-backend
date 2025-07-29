@@ -7,47 +7,47 @@ import { map, tap, catchError } from 'rxjs/operators';
 export class SoldiersService {
   private readonly url = process.env.GOOGLE_SCRIPT_URL || '';
   // TODO: fix any
-  private soldiers: any = null; // in memory cache
+  private personalNumbers: any = null; // in memory cache
   private isUpdating = false;
 
   constructor(private readonly httpService: HttpService) {}
 
   getSoldiers(): Observable<any> {
-    // If we have cached soldiers, return them and update in background
-    if (this.soldiers) {
-      this.updateSoldiersAsync();
-      return of(this.soldiers);
+    return this.httpService
+      .get(this.url)
+      .pipe(map((response) => response.data));
+  }
+
+  getPersonalNumbers(): Observable<any> {
+    // If we have cached personal numbers, return them and update in background
+    if (this.personalNumbers) {
+      this.updatePersonalNumbersAsync();
+      return of(this.personalNumbers);
     }
 
     // No cache, fetch for the first time
-    return this.httpService.get(this.url).pipe(
+    return this.httpService.get(this.url + '?action=personal-numbers').pipe(
       map((response) => response.data),
       tap((data) => {
-        this.soldiers = data;
+        this.personalNumbers = data;
       }),
     );
   }
 
-  getPersonalNumbers(): Observable<any> {
-    return this.httpService
-      .get(this.url + '?action=personal-numbers')
-      .pipe(map((response) => response.data));
-  }
-
-  private updateSoldiersAsync(): void {
+  private updatePersonalNumbersAsync(): void {
     // Don't update if already updating
     if (this.isUpdating) return;
 
     this.isUpdating = true;
     this.httpService
-      .get(this.url)
+      .get(this.url + '?action=personal-numbers')
       .pipe(
         map((response) => response.data),
         tap((data) => {
-          this.soldiers = data;
+          this.personalNumbers = data;
         }),
         catchError((error) => {
-          console.error('Failed to update soldiers cache:', error);
+          console.error('Failed to update personal numbers cache:', error);
           return of(null);
         }),
       )
