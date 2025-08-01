@@ -6,48 +6,53 @@ import { map, tap, catchError } from 'rxjs/operators';
 @Injectable()
 export class SoldiersService {
   private readonly url = process.env.GOOGLE_SCRIPT_URL || '';
-  // TODO: fix any
-  private personalNumbers: any = null; // in memory cache
+  private personalNumbersCache: string[] | null = null;
   private isUpdating = false;
 
   constructor(private readonly httpService: HttpService) {}
 
-  getSoldiers(): Observable<any> {
+  private buildUrl(type: string, action?: string): string {
+    const params = new URLSearchParams({ type });
+    if (action) params.append('action', action);
+    return `${this.url}?${params.toString()}`;
+  }
+
+  getSoldiers(): Observable<any[]> {
     return this.httpService
-      .get(this.url)
+      .get(this.buildUrl('soldiers'))
       .pipe(map((response) => response.data));
   }
 
-  getPersonalNumbers(): Observable<any> {
-    // If we have cached personal numbers, return them and update in background
-    if (this.personalNumbers) {
-      this.updatePersonalNumbersAsync();
-      return of(this.personalNumbers);
+  getPersonalNumbers(): Observable<string[]> {
+    if (this.personalNumbersCache) {
+      this.updatePersonalNumbersAsync(); // update in background
+      return of(this.personalNumbersCache);
     }
 
-    // No cache, fetch for the first time
-    return this.httpService.get(this.url + '?action=personal-numbers').pipe(
-      map((response) => response.data),
-      tap((data) => {
-        this.personalNumbers = data;
-      }),
-    );
-  }
-
-  private updatePersonalNumbersAsync(): void {
-    // Don't update if already updating
-    if (this.isUpdating) return;
-
-    this.isUpdating = true;
-    this.httpService
-      .get(this.url + '?action=personal-numbers')
+    return this.httpService
+      .get(this.buildUrl('soldiers', 'personal-numbers'))
       .pipe(
         map((response) => response.data),
         tap((data) => {
-          this.personalNumbers = data;
+          this.personalNumbersCache = data;
         }),
-        catchError((error) => {
-          console.error('Failed to update personal numbers cache:', error);
+      );
+  }
+
+  private updatePersonalNumbersAsync(): void {
+    if (this.isUpdating) return;
+
+    this.isUpdating = true;
+
+    this.httpService
+      .get(this.buildUrl('soldiers', 'personal-numbers'))
+      .pipe(
+        map((res) => res.data),
+        tap((data) => {
+          this.personalNumbersCache = data;
+        }),
+        catchError((err) => {
+          console.error('Failed to update personal numbers:', err);
           return of(null);
         }),
       )
